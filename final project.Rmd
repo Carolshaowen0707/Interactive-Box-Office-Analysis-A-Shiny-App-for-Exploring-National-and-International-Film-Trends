@@ -1,0 +1,109 @@
+---
+title: "Final project: Interactive Box Office Analysis: A Shiny App for Exploring National and International Film Trends"
+author: "Shaowen (Carol) Weng, Alex Gao, Rong Shi"
+date: "11/7/2021"
+output: html_document
+runtime: shiny
+---
+
+```{r}
+library(tidyverse)
+library(rvest)
+page <- read_html("https://piaofang.maoyan.com/rankings/year")
+```
+
+
+```{r}
+release_month <- page %>%  
+  html_nodes(".second-line") %>%  
+  html_text()%>%
+  str_remove("上映")%>%
+  str_split("-",n=2)%>%
+  map(2, .default) %>%
+  str_split("-") %>%
+  map(1, .default) %>%
+  as.numeric()
+
+release_year <- page %>%  
+  html_nodes(".second-line") %>%  
+  html_text()%>%
+  str_remove("上映")%>%
+  str_split("-",n=2)%>%
+  map(1, .default) %>%
+  as.numeric() %>%
+  as.table()
+
+release_time <- tibble(release_year, release_month)
+```
+
+
+```{r}
+library(tidyverse)
+library("readxl")
+ChineseMovies <- read_excel("final_project.xlsx")
+```
+
+```{r}
+final <- cbind(release_time, ChineseMovies)
+unique(final$release_year)
+```
+
+```{r}
+library(tidyverse)
+library(shiny)
+# Define UI for application (temp, wind_speed, precip)
+ui <- fluidPage(
+  
+  # Application title
+  titlePanel("Film Box Office in China"),
+  
+  # Input: Sidebar with a slider input for number of bins 
+  sidebarLayout(
+    sidebarPanel(
+      checkboxGroupInput(inputId = "Country", 
+                         label = "Select Origin Country(s):",
+                         choiceNames =
+                           list("National(China)", "International"),
+                         choiceValues =
+                           list("N", "I")),
+      varSelectInput(
+        "Explanatory_Variable",
+        label = "Select X-Variable to Display",
+        data = final %>% select(release_year, release_month),
+        selected = "release_year"),
+      varSelectInput(
+        "Response_Variable",
+        label = "Select Y-Variable to Display",
+        data = final %>% select(Box_Office, Avg_ticket_price),
+        selected = "Box_Office")
+    ),
+      
+    
+    # Output: Show a plot of the generated distribution
+    mainPanel(
+      plotOutput("displot")
+    )
+  )
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+  
+  
+  output$displot <- renderPlot({
+    ChineseMovies_filtered <- final %>% filter( 
+                                               Country %in% input$Country)
+    
+    ggplot(data = ChineseMovies_filtered) + 
+      geom_point(aes(x = !!input$Explanatory_Variable, y = !!input$Response_Variable)) +
+      geom_smooth(aes(x = !!input$Explanatory_Variable, y = !!input$Response_Variable), se = TRUE)
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
